@@ -20,7 +20,7 @@ fi
 mkdir -p "${BACKUP_DIR}/last/" "${BACKUP_DIR}/daily/" "${BACKUP_DIR}/weekly/" "${BACKUP_DIR}/monthly/"
 
 #Loop all databases
-for DB in ${POSTGRES_DBS}; do
+for DB in ${DB_NAMES}; do
   #Initialize filename vers
   LAST_FILENAME="${DB}-`date +%Y%m%d-%H%M%S`${BACKUP_SUFFIX}"
   DAILY_FILENAME="${DB}-`date +%Y%m%d`${BACKUP_SUFFIX}"
@@ -31,13 +31,21 @@ for DB in ${POSTGRES_DBS}; do
   WFILE="${BACKUP_DIR}/weekly/${WEEKLY_FILENAME}"
   MFILE="${BACKUP_DIR}/monthly/${MONTHY_FILENAME}"
   #Create dump
-  if [ "${POSTGRES_CLUSTER}" = "TRUE" ]; then
-    echo "Creating cluster dump of ${DB} database from ${POSTGRES_HOST}..."
-    pg_dumpall -l "${DB}" ${POSTGRES_EXTRA_OPTS} | gzip > "${FILE}"
-  else
-    echo "Creating dump of ${DB} database from ${POSTGRES_HOST}..."
-    pg_dump -d "${DB}" -f "${FILE}" ${POSTGRES_EXTRA_OPTS}
-  fi
+  case "${DB_TYPE}" in
+    postgresql)
+      if [ "${DB_CLUSTER}" = "TRUE" ]; then
+        echo "Creating cluster dump of ${DB} database from ${DB_HOST}..."
+        pg_dumpall -l "${DB}" ${DB_EXTRA_OPTS} | gzip > "${FILE}"
+      else
+        echo "Creating dump of ${DB} database from ${DB_HOST}..."
+        pg_dump -d "${DB}" -f "${FILE}" ${DB_EXTRA_OPTS}
+      fi
+      ;;
+    mongodb)
+      echo "Creating dump of ${DB} database from ${DB_HOST}..."
+      mongodump --uri="${MONGO_URI}" --db="${DB}" --archive ${DB_EXTRA_OPTS} | gzip > "${FILE}"
+      ;;
+  esac
   #Copy (hardlink) for each entry
   if [ -d "${FILE}" ]; then
     DFILENEW="${DFILE}-new"
@@ -88,14 +96,14 @@ for DB in ${POSTGRES_DBS}; do
     echo "Not updating lastest backup."
   fi
   #Clean old files
-  echo "Cleaning older files for ${DB} database from ${POSTGRES_HOST}..."
+  echo "Cleaning older files for ${DB} database from ${DB_HOST}..."
   find "${BACKUP_DIR}/last" -maxdepth 1 -mmin "+${KEEP_MINS}" -name "${DB}-*${BACKUP_SUFFIX}" -exec rm -rvf '{}' ';'
   find "${BACKUP_DIR}/daily" -maxdepth 1 -mtime "+${KEEP_DAYS}" -name "${DB}-*${BACKUP_SUFFIX}" -exec rm -rvf '{}' ';'
   find "${BACKUP_DIR}/weekly" -maxdepth 1 -mtime "+${KEEP_WEEKS}" -name "${DB}-*${BACKUP_SUFFIX}" -exec rm -rvf '{}' ';'
   find "${BACKUP_DIR}/monthly" -maxdepth 1 -mtime "+${KEEP_MONTHS}" -name "${DB}-*${BACKUP_SUFFIX}" -exec rm -rvf '{}' ';'
 done
 
-echo "SQL backup created successfully"
+echo "Backup created successfully"
 
 # Post-backup hook
 if [ -d "${HOOKS_DIR}" ]; then

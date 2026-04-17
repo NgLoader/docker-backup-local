@@ -1,5 +1,5 @@
-ARG BASETAG=latest
-FROM postgres:$BASETAG
+ARG BASE_IMAGE=postgres:18
+FROM ${BASE_IMAGE}
 
 ARG GOCRONVER=v0.0.11
 ARG TARGETOS
@@ -8,14 +8,14 @@ ARG TARGETARCH
 # FIX Debian cross build
 ARG DEBIAN_FRONTEND=noninteractive
 RUN set -x \
-	&& ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split \
-	&& ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb \
-	&& ln -s /bin/tar /usr/sbin/tar \
-	&& ln -s /bin/rm /usr/sbin/rm \
-	&& ln -s /usr/bin/dpkg-split /usr/local/sbin/dpkg-split \
-	&& ln -s /usr/bin/dpkg-deb /usr/local/sbin/dpkg-deb \
-	&& ln -s /bin/tar /usr/local/sbin/tar \
-	&& ln -s /bin/rm /usr/local/sbin/rm
+	&& ln -sf /usr/bin/dpkg-split /usr/sbin/dpkg-split \
+	&& ln -sf /usr/bin/dpkg-deb /usr/sbin/dpkg-deb \
+	&& ln -sf /bin/tar /usr/sbin/tar \
+	&& ln -sf /bin/rm /usr/sbin/rm \
+	&& ln -sf /usr/bin/dpkg-split /usr/local/sbin/dpkg-split \
+	&& ln -sf /usr/bin/dpkg-deb /usr/local/sbin/dpkg-deb \
+	&& ln -sf /bin/tar /usr/local/sbin/tar \
+	&& ln -sf /bin/rm /usr/local/sbin/rm
 #
 
 RUN set -x \
@@ -23,17 +23,19 @@ RUN set -x \
 	&& curl --fail --retry 4 --retry-all-errors -o /usr/local/bin/go-cron.gz -L https://github.com/prodrigestivill/go-cron/releases/download/$GOCRONVER/go-cron-$TARGETOS-$TARGETARCH.gz \
 	&& gzip -vnd /usr/local/bin/go-cron.gz && chmod a+x /usr/local/bin/go-cron
 
-ENV POSTGRES_DB="**None**" \
-    POSTGRES_DB_FILE="**None**" \
-    POSTGRES_HOST="**None**" \
-    POSTGRES_PORT=5432 \
-    POSTGRES_USER="**None**" \
-    POSTGRES_USER_FILE="**None**" \
-    POSTGRES_PASSWORD="**None**" \
-    POSTGRES_PASSWORD_FILE="**None**" \
-    POSTGRES_PASSFILE_STORE="**None**" \
-    POSTGRES_EXTRA_OPTS="-Z1" \
-    POSTGRES_CLUSTER="FALSE" \
+ENV DB_TYPE="**None**" \
+    DB_HOST="**None**" \
+    DB_PORT="**None**" \
+    DB_NAME="**None**" \
+    DB_NAME_FILE="**None**" \
+    DB_USER="**None**" \
+    DB_USER_FILE="**None**" \
+    DB_PASS="**None**" \
+    DB_PASS_FILE="**None**" \
+    DB_PASSFILE_STORE="**None**" \
+    DB_AUTH="**None**" \
+    DB_CLUSTER="FALSE" \
+    DB_EXTRA_OPTS="" \
     SCHEDULE="@daily" \
     VALIDATE_ON_START="TRUE" \
     BACKUP_ON_START="FALSE" \

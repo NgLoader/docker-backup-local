@@ -1,15 +1,15 @@
-# postgres-backup-local build instructions
+# db-backup-local build instructions
 
-To build and push all images to it's own repository.
+Builds all image variants (PostgreSQL 13–18 × debian/alpine; MongoDB 8 debian) via `docker buildx bake`.
 
 ## Prepare environment
 
-* Configure you system to use [Docker Buildx](https://docs.docker.com/buildx/working-with-buildx/).
-* Prepare crosscompile environment (see below).
+- Configure your system to use [Docker Buildx](https://docs.docker.com/buildx/working-with-buildx/).
+- Prepare the crosscompile environment (see below) for multi-arch builds.
 
 ### Prepare crosscompile environment
 
-In order to work in Arch Linux the following initialization commands will be required:
+On Arch Linux (for example):
 
 ```sh
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -18,28 +18,57 @@ docker buildx create --name multibuilder --platform linux/amd64,linux/arm64,linu
 docker buildx inspect --bootstrap
 ```
 
-## Generate the images
+## Regenerate docker-bake.hcl
 
-In order to only build the images locally run the following command:
+`docker-bake.hcl` is generated — do not edit by hand. Change `generate-docker-bake.sh` and regenerate:
+
+```sh
+./generate-docker-bake.sh docker-bake.hcl
+```
+
+CI verifies the checked-in `docker-bake.hcl` matches the generator output.
+
+## Build locally
+
+Build all targets:
 
 ```sh
 docker buildx bake --pull
 ```
 
-In order to build modifying the image name and the registry prefix run the following command:
+Build a specific target:
 
 ```sh
-REGISTRY_PREFIX="dockerhub_username/" IMAGE_NAME="postgres-backup-local" docker buildx bake --pull
+docker buildx bake --pull postgresql-debian-18
+docker buildx bake --pull mongodb-debian-8
 ```
 
-In order to publish directly to the registry run this command instead:
+## Build with a custom image name or registry
 
 ```sh
-REGISTRY_PREFIX="dockerhub_username/" docker buildx bake --pull --push
+REGISTRY_PREFIX="ghcr.io/my-org/" IMAGE_NAME="db-backup-local" docker buildx bake --pull
 ```
 
-Also, optionally, it can also generate build revision tags from last git commit:
+## Push to a registry
 
 ```sh
-REGISTRY_PREFIX="dockerhub_username/" BUILD_REVISION=$(git rev-parse --short HEAD) docker buildx bake --pull --push
+REGISTRY_PREFIX="ghcr.io/my-org/" docker buildx bake --pull --push
+```
+
+With a build revision suffix:
+
+```sh
+REGISTRY_PREFIX="ghcr.io/my-org/" \
+  BUILD_REVISION=$(git rev-parse --short HEAD) \
+  docker buildx bake --pull --push
+```
+
+With release version tags:
+
+```sh
+REGISTRY_PREFIX="ghcr.io/my-org/" \
+  RELEASE_VERSION=v1.2.3 \
+  RELEASE_VERSION_MINOR=v1.2 \
+  RELEASE_VERSION_MAJOR=v1 \
+  docker buildx bake --pull --push
 ```
