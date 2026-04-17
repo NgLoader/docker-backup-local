@@ -16,7 +16,7 @@ This application requires the docker volume `/backups` to be a POSIX-compliant f
 
 ## Supported engines and image tags
 
-Published to GitHub Container Registry: `ghcr.io/NgLoader/db-backup-local`.
+Published to GitHub Container Registry: `ghcr.io/ngloader/db-backup-local`.
 
 | Engine | Versions | Tag examples |
 |---|---|---|
@@ -39,7 +39,7 @@ services:
       POSTGRES_USER: username
       POSTGRES_PASSWORD: password
   dbbackups:
-    image: ghcr.io/NgLoader/db-backup-local:postgresql-18
+    image: ghcr.io/ngloader/db-backup-local:postgresql-18
     restart: always
     user: postgres:postgres
     volumes:
@@ -73,7 +73,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: password
       MONGO_INITDB_DATABASE: database
   dbbackups:
-    image: ghcr.io/NgLoader/db-backup-local:mongodb-8
+    image: ghcr.io/ngloader/db-backup-local:mongodb-8
     restart: always
     volumes:
       - /var/opt/dbbackups:/backups
@@ -174,7 +174,7 @@ The default container runs on `SCHEDULE`. To trigger a backup immediately:
 docker run --rm -v "$PWD:/backups" -u "$(id -u):$(id -g)" \
   -e DB_TYPE=postgresql -e DB_HOST=postgres -e DB_NAME=dbname \
   -e DB_USER=user -e DB_PASS=password \
-  ghcr.io/NgLoader/db-backup-local:postgresql-18 /backup.sh
+  ghcr.io/ngloader/db-backup-local:postgresql-18 /backup.sh
 ```
 
 ## Restore examples

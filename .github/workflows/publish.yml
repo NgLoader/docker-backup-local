@@ -90,9 +90,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute registry prefix (ghcr requires lowercase)
+        id: registry
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "prefix=ghcr.io/${OWNER_LC}/" >> "$GITHUB_OUTPUT"
+
       - name: Build and push images
         env:
-          REGISTRY_PREFIX: ghcr.io/${{ github.repository_owner }}/
+          REGISTRY_PREFIX: ${{ steps.registry.outputs.prefix }}
           BUILD_REVISION: ${{ steps.version.outputs.sha_short }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           RELEASE_VERSION_MINOR: ${{ steps.version.outputs.version_minor }}
