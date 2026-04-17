@@ -59,11 +59,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
 
+      - name: Seed test data
+        env:
+          PGPASSWORD: "test"
+        run: |
+          psql -h 127.0.0.1 -U user -d database -c "CREATE TABLE ci_check (id int PRIMARY KEY, name text);"
+          psql -h 127.0.0.1 -U user -d database -c "INSERT INTO ci_check VALUES (1,'a'),(2,'b'),(3,'c');"
+
       - name: Test backup script for pg_dump
         env:
           DB_CLUSTER: "FALSE"
           DB_EXTRA_OPTS: "-Z0"
           BACKUP_SUFFIX: ".sql.gz"
+          PGPASSWORD: "test"
         run: |
           echo "Test backup script for pg_dump..."
           rm -fR "$BACKUP_DIR"
@@ -71,6 +79,24 @@ jobs:
           bash -x backup.sh
           echo "Generated backup files:"
           ls -laR "$BACKUP_DIR"
+
+          echo "Verify rotation hardlinks share one inode..."
+          LAST_FILE=$(ls "$BACKUP_DIR"/last/database-2*.sql.gz | head -1)
+          LAST_INO=$(stat -c %i "$LAST_FILE")
+          for D in daily weekly monthly; do
+            F=$(ls "$BACKUP_DIR/$D"/database-2*.sql.gz | head -1)
+            INO=$(stat -c %i "$F")
+            [ "$INO" = "$LAST_INO" ] || { echo "FAIL: $F inode $INO != last $LAST_INO"; exit 1; }
+          done
+          echo "Rotation OK (shared inode $LAST_INO)"
+
+          echo "Verify roundtrip restore..."
+          psql -h 127.0.0.1 -U user -d postgres -c "DROP DATABASE IF EXISTS ci_restore"
+          psql -h 127.0.0.1 -U user -d postgres -c "CREATE DATABASE ci_restore"
+          zcat "$LAST_FILE" | psql -h 127.0.0.1 -U user -d ci_restore
+          COUNT=$(psql -h 127.0.0.1 -U user -d ci_restore -tAc "SELECT COUNT(*) FROM ci_check")
+          [ "$COUNT" = "3" ] || { echo "FAIL: restored $COUNT rows, expected 3"; exit 1; }
+          echo "Roundtrip OK (3 rows)"
 
       - name: Test backup script for pg_dump with directories
         env:
@@ -97,6 +123,16 @@ jobs:
           bash -x backup.sh
           echo "Generated backup files:"
           ls -laR "$BACKUP_DIR"
+
+          echo "Verify rotation hardlinks share one inode..."
+          LAST_FILE=$(ls "$BACKUP_DIR"/last/database-2*.sql.gz | head -1)
+          LAST_INO=$(stat -c %i "$LAST_FILE")
+          for D in daily weekly monthly; do
+            F=$(ls "$BACKUP_DIR/$D"/database-2*.sql.gz | head -1)
+            INO=$(stat -c %i "$F")
+            [ "$INO" = "$LAST_INO" ] || { echo "FAIL: $F inode $INO != last $LAST_INO"; exit 1; }
+          done
+          echo "Rotation OK (shared inode $LAST_INO)"
 
   test-mongodb:
     runs-on: ubuntu-22.04
@@ -142,7 +178,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mongodb-database-tools
 
+      - name: Seed test data
+        env:
+          MONGO_URI: "mongodb://user:test@127.0.0.1:27017/database?authSource=admin"
+        run: |
+          printf '{"id":1,"name":"a"}\n{"id":2,"name":"b"}\n{"id":3,"name":"c"}\n' > /tmp/seed.json
+          mongoimport --uri="$MONGO_URI" --collection=ci_check --file=/tmp/seed.json
+
       - name: Test backup script for mongodump
+        env:
+          MONGO_URI: "mongodb://user:test@127.0.0.1:27017/database?authSource=admin"
         run: |
           echo "Test backup script for mongodump..."
           rm -fR "$BACKUP_DIR"
@@ -150,6 +195,22 @@ jobs:
           bash -x backup.sh
           echo "Generated backup files:"
           ls -laR "$BACKUP_DIR"
+
+          echo "Verify rotation hardlinks share one inode..."
+          LAST_FILE=$(ls "$BACKUP_DIR"/last/database-2*.archive.gz | head -1)
+          LAST_INO=$(stat -c %i "$LAST_FILE")
+          for D in daily weekly monthly; do
+            F=$(ls "$BACKUP_DIR/$D"/database-2*.archive.gz | head -1)
+            INO=$(stat -c %i "$F")
+            [ "$INO" = "$LAST_INO" ] || { echo "FAIL: $F inode $INO != last $LAST_INO"; exit 1; }
+          done
+          echo "Rotation OK (shared inode $LAST_INO)"
+
+          echo "Verify roundtrip restore..."
+          gunzip -c "$LAST_FILE" | mongorestore --uri="$MONGO_URI" --archive --drop --nsInclude="database.ci_check"
+          COUNT=$(mongoexport --uri="$MONGO_URI" --collection=ci_check --query='{}' 2>/dev/null | wc -l)
+          [ "$COUNT" = "3" ] || { echo "FAIL: restored $COUNT docs, expected 3"; exit 1; }
+          echo "Roundtrip OK (3 docs)"
 
   test-bake:
     runs-on: ubuntu-latest
